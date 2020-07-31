@@ -1,0 +1,6 @@
+*.pyc
+*.cfg
+settings.py
+*.db
+*.sqlite3
+*.csv
