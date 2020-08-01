@@ -31,7 +31,11 @@ class TechshopSpider(CrawlSpider):
 
         # make sure the field exists before doing regex
         if text != "None":
-            return re.search(self.product_info_regex, text).group(1)
+            matched = re.search(self.product_info_regex, text)
+            if matched:
+                return matched.group(1)
+            else:
+                return text
         else:
             return None
     
@@ -70,7 +74,7 @@ class TechshopSpider(CrawlSpider):
 
         model_text = str(response 
                         .xpath("//*[@class='product-intro'] \
-                            //span[contains(text(),'Model')]/text()") 
+                            //span[contains(text(),'Model :')]/text()") 
                         .get()
                     )
         item['model'] = self.extract_text(model_text)

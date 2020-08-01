@@ -5,9 +5,22 @@
 
 
 # useful for handling different item types with a single interface
-from itemadapter import ItemAdapter
+import os
+import datetime
+from scrapy.exceptions import DropItem
+from scraper.db_utils import SQLiteExporter
+
+class SQLitePipeline:
 
 
-class ScraperPipeline:
+    db_filename = "techshop.db"
+    def open_spider(self, spider):
+        self.exporter = SQLiteExporter(self.db_filename)
+        self.exporter.start_exporting()
+
+    def close_spider(self, spider):
+        self.exporter.finish_exporting()
+
     def process_item(self, item, spider):
+        self.exporter.export_item(item)
         return item
