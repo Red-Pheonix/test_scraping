@@ -1,7 +1,8 @@
 import os
+import csv
 import datetime
-import sqlite3
 import logging
+import sqlite3
 from scrapy.exporters import BaseItemExporter
 
 class SQLiteExporter(BaseItemExporter):
@@ -113,4 +114,41 @@ class SQLiteExporter(BaseItemExporter):
                 (product_id, category, price, quantity, date)
             )
 
-        
+
+def export_to_csv(database):
+    """ Exports sqlite database as a csv file """
+
+    if not os.path.exists(database):
+        raise FileNotFoundError("Couldn't find database file")
+    else:
+        try:
+            # open database
+            connection = sqlite3.connect(database)
+            cursor = connection.cursor()
+
+            #  query all data from database
+            show_all_data_sql = """
+                SELECT
+                    i.product_id, i.category, i.name,
+                    i.model, i.brand, i.supplier, i.summary,
+                    s.price, s.quantity, s.date
+                FROM
+                    product_info i
+                    INNER JOIN product_status s 
+                        ON i.product_id = s.product_id
+            """
+            cursor.execute(show_all_data_sql)
+
+            # write output to a csv file
+            csv_filename = database.split(".")[0] + ".csv"
+
+            with open(csv_filename, "w", encoding="utf-8", newline='') as csv_file:
+                csv_writer = csv.writer(csv_file)
+                csv_writer.writerow([header[0] for header in cursor.description])
+                csv_writer.writerows(cursor) 
+
+        except sqlite3.Error as error:
+            logging.error("Error while exporting the database")
+        finally:
+            cursor.close()
+            connection.close()

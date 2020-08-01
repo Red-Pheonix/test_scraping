@@ -10,7 +10,7 @@ import datetime
 import pymongo
 from itemadapter import ItemAdapter
 from scrapy.exceptions import DropItem
-from scraper.db_utils import SQLiteExporter
+from scraper.db_utils import SQLiteExporter, export_to_csv
 
 class SQLitePipeline:
 
@@ -28,6 +28,7 @@ class SQLitePipeline:
 
     def close_spider(self, spider):
         self.exporter.finish_exporting()
+        export_to_csv(self.sqlite_db)
 
     def process_item(self, item, spider):
         self.exporter.export_item(item)
