@@ -30,7 +30,7 @@ class TechshopSpider(CrawlSpider):
 
 
         # make sure the field exists before doing regex
-        if text:
+        if text != "None":
             return re.search(self.product_info_regex, text).group(1)
         else:
             return None
@@ -54,7 +54,7 @@ class TechshopSpider(CrawlSpider):
         self.logger.info(response.url)
         # extract product info from the page
         item = items.ProductItem()
-        
+
         # extract from url
         item['category'] = str(re.search(self.category_regex, response.url) 
                                 .group(1)
