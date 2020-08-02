@@ -4,20 +4,27 @@ import datetime
 import logging
 import sqlite3
 from scrapy.exporters import BaseItemExporter
+from scrapy.exceptions import CloseSpider
 
 class SQLiteExporter(BaseItemExporter):
     """ Item exporter for handling sqlite export """
 
 
-    def __init__(self, file, **kwargs):
-        self.file = file
+    def __init__(self, db, **kwargs):
+        self.db = db # filename for the database
         self.logger = logging.getLogger("SQLiteExporterLogger")
-        # create database if it doesn't exist already
-        if not os.path.exists(self.file):
-            try:
-                connection = sqlite3.connect(self.file)
-                cursor = connection.cursor()
 
+        # if connection fails, connection variable will remain None
+        # check it, otherwise get unhandled errors
+        self.connection = None
+        self.cursor = None
+
+        # create database if it doesn't exist already
+        if not os.path.exists(self.db):
+            try:
+                self.connection = sqlite3.connect(self.db)
+
+                # configure the newly opened database
                 create_product_info_table_sql = """
                         CREATE TABLE product_info(
                             product_id INTEGER NOT NULL,
@@ -44,25 +51,36 @@ class SQLiteExporter(BaseItemExporter):
                             PRIMARY KEY(product_id, category, date)
                         );
                 """
-                cursor.execute(create_product_info_table_sql)
-                cursor.execute(create_product_status_table_sql)
+                self.connection.execute(create_product_info_table_sql)
+                self.connection.execute(create_product_status_table_sql)
 
-                connection.commit()
+                self.connection.commit()
 
             except sqlite3.Error as error:
-                self.logger.error("Error creating tables: %s", error)
-                connection.rollback()
+                # shutdown crawling if we can't create database
+                self.logger.error("Couldn't create database: %s", error)
+                if self.connection:
+                    self.connection.rollback()
+                raise error
             finally:
-                cursor.close()
-                connection.close()
+                if self.connection:
+                    self.connection.close()
 
     def start_exporting(self):
-        self.connection = sqlite3.connect(self.file)
-        self.cursor = self.connection.cursor()
+        try:
+            # establish connection to database
+            self.connection = sqlite3.connect(self.db)
+            self.cursor = self.connection.cursor()
+        except sqlite3.Error as error:
+            # shutdown crawling if we can't access database
+            self.logger.error("Error opening database: %s", error)
+            raise error
 
     def finish_exporting(self):
-        self.cursor.close()
-        self.connection.close()
+        if self.cursor:
+            self.cursor.close()
+        if self.connection:
+            self.connection.close()
     
     def insert_items(self, sql_command, parameters):
         """ Helper function for inserting data into the database """
@@ -77,7 +95,7 @@ class SQLiteExporter(BaseItemExporter):
         self.logger.debug("Inserting items: %s", item)
         # sql for inserting data
         insert_product_info_sql = """
-            INSERT INTO product_info(
+            INSERT or IGNORE INTO  product_info(
                             product_id, category, 
                             name, model, brand, 
                             supplier, summary)
@@ -85,7 +103,7 @@ class SQLiteExporter(BaseItemExporter):
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """
         insert_product_status_sql = """
-            INSERT INTO product_status(
+            INSERT or IGNORE INTO product_status(
                             product_id, category, 
                             price, quantity, 
                             date)
@@ -118,9 +136,11 @@ class SQLiteExporter(BaseItemExporter):
 def export_to_csv(database):
     """ Exports sqlite database as a csv file """
 
-    if not os.path.exists(database):
-        raise FileNotFoundError("Couldn't find database file")
-    else:
+    
+    # if connection fails, connection variable will remain None
+    # check it, otherwise get unhandled errors
+    connection = None
+    if os.path.exists(database):
         try:
             # open database
             connection = sqlite3.connect(database)
@@ -148,7 +168,10 @@ def export_to_csv(database):
                 csv_writer.writerows(cursor) 
 
         except sqlite3.Error as error:
-            logging.error("Error while exporting the database")
+            logging.error("Error while exporting the database %s", error)
         finally:
-            cursor.close()
-            connection.close()
+            if connection:
+                cursor.close()
+                connection.close()
+    else:
+        logging.error("Couldn't find database file")

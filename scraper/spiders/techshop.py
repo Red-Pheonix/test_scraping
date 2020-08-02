@@ -2,7 +2,7 @@ import re
 import scrapy
 from scrapy.spiders import CrawlSpider, Rule
 from scrapy.linkextractors import LinkExtractor
-from .. import items
+from scraper.items import ProductItem
 
 class TechshopSpider(CrawlSpider):
     """ A CrawlSpider for scraping from techshopbd """
@@ -35,6 +35,7 @@ class TechshopSpider(CrawlSpider):
             if matched:
                 return matched.group(1)
             else:
+                # this function always returns text, even without a match
                 return text
         else:
             return None
@@ -55,9 +56,9 @@ class TechshopSpider(CrawlSpider):
         """ Parse and extract info from the response given from the spider """
 
 
-        self.logger.info(response.url)
+        self.logger.info("Found product page: %s ",response.url)
         # extract product info from the page
-        item = items.ProductItem()
+        item = ProductItem()
 
         # extract from url
         item['category'] = str(re.search(self.category_regex, response.url) 
@@ -98,7 +99,7 @@ class TechshopSpider(CrawlSpider):
                                 .getall()
                             ).strip()
 
-        # dynamic fields
+        # changing fields
         item['price'] = float(response 
                             .css('.product_price_box') 
                             .css('.spacial_price::text')
@@ -111,7 +112,5 @@ class TechshopSpider(CrawlSpider):
                             .get()
                         )
         item['quantity'] = self.extract_quantity(quantity_text)
-
-        self.logger.info(str(item))
 
         return item
