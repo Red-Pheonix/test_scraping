@@ -4,14 +4,13 @@ import datetime
 import logging
 import sqlite3
 from scrapy.exporters import BaseItemExporter
-from scrapy.exceptions import CloseSpider
+
 
 class SQLiteExporter(BaseItemExporter):
     """ Item exporter for handling sqlite export """
 
-
     def __init__(self, db, **kwargs):
-        self.db = db # filename for the database
+        self.db = db  # filename for the database
         self.logger = logging.getLogger("SQLiteExporterLogger")
 
         # if connection fails, connection variable will remain None
@@ -81,7 +80,7 @@ class SQLiteExporter(BaseItemExporter):
             self.cursor.close()
         if self.connection:
             self.connection.close()
-    
+
     def insert_items(self, sql_command, parameters):
         """ Helper function for inserting data into the database """
         try:
@@ -96,16 +95,16 @@ class SQLiteExporter(BaseItemExporter):
         # sql for inserting data
         insert_product_info_sql = """
             INSERT or IGNORE INTO  product_info(
-                            product_id, category, 
-                            name, model, brand, 
+                            product_id, category,
+                            name, model, brand,
                             supplier, summary)
 
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """
         insert_product_status_sql = """
             INSERT or IGNORE INTO product_status(
-                            product_id, category, 
-                            price, quantity, 
+                            product_id, category,
+                            price, quantity,
                             date)
 
             VALUES (?, ?, ?, ?, ?)
@@ -126,17 +125,17 @@ class SQLiteExporter(BaseItemExporter):
 
         # insert items into the two tables
         self.insert_items(insert_product_info_sql,
-                (product_id, category, name, model, brand, supplier, summary)
-            )
+                          (product_id, category, name,
+                           model, brand, supplier, summary)
+                          )
         self.insert_items(insert_product_status_sql,
-                (product_id, category, price, quantity, date)
-            )
+                          (product_id, category, price, quantity, date)
+                          )
 
 
 def export_to_csv(database):
     """ Exports sqlite database as a csv file """
 
-    
     # if connection fails, connection variable will remain None
     # check it, otherwise get unhandled errors
     connection = None
@@ -154,7 +153,7 @@ def export_to_csv(database):
                     s.price, s.quantity, s.date
                 FROM
                     product_info i
-                    INNER JOIN product_status s 
+                    INNER JOIN product_status s
                         ON i.product_id = s.product_id
             """
             cursor.execute(show_all_data_sql)
@@ -164,8 +163,9 @@ def export_to_csv(database):
 
             with open(csv_filename, "w", encoding="utf-8", newline='') as csv_file:
                 csv_writer = csv.writer(csv_file)
-                csv_writer.writerow([header[0] for header in cursor.description])
-                csv_writer.writerows(cursor) 
+                csv_writer.writerow([header[0]
+                                    for header in cursor.description])
+                csv_writer.writerows(cursor)
 
         except sqlite3.Error as error:
             logging.error("Error while exporting the database %s", error)

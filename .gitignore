@@ -5,3 +5,4 @@ settings.py
 *.sqlite3
 *.csv
 *.log
+*.json

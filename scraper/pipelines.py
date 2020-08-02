@@ -5,19 +5,18 @@
 
 
 # useful for handling different item types with a single interface
-import os
 import datetime
 import logging
 import pymongo
 from itemadapter import ItemAdapter
-from scrapy.exceptions import DropItem, CloseSpider
+from scrapy.exceptions import DropItem
 from scraper.db_utils import SQLiteExporter, export_to_csv
+
 
 class SQLitePipeline:
 
-
     def __init__(self, sqlite_db):
-        self.sqlite_db = sqlite_db # sqlite database filename
+        self.sqlite_db = sqlite_db  # sqlite database filename
 
     @classmethod
     def from_crawler(cls, crawler):
@@ -35,13 +34,14 @@ class SQLitePipeline:
         self.exporter.export_item(item)
         return item
 
+
 class MongoPipeline:
 
     collection_name = 'techshop'
 
     def __init__(self, mongo_uri, mongo_db):
-        self.mongo_uri = mongo_uri # mongo uri for connecting to mongodb
-        self.mongo_db = mongo_db # database we will be working with
+        self.mongo_uri = mongo_uri  # mongo uri for connecting to mongodb
+        self.mongo_db = mongo_db    # database we will be working with
         self.logger = logging.getLogger("MongoPipeLine")
 
         # if connection fails, client and db variable will remain None
