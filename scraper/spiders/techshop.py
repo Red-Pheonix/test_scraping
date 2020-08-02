@@ -50,7 +50,13 @@ class TechshopSpider(CrawlSpider):
             return 0
 
     def parse_product(self, response):
-        """ Parse and extract info from the response given from the spider """
+        """ Parse and extract info from the response given from the spider
+
+            @url https://www.techshopbd.com/product-categories/displays/2928/1-54-inch-e-ink-display-module-monochrome-techshop-bangladesh
+            @returns items 0 1
+            @scrapes name product_id category price model brand supplier quantity summary
+
+        """
 
         self.logger.info("Found product page: %s ", response.url)
         # extract product info from the page
