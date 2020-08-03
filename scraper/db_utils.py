@@ -133,6 +133,69 @@ class SQLiteExporter(BaseItemExporter):
                           )
 
 
+class RockySqliteItemExporter(BaseItemExporter):
+    """ Not exactly mine. From here,
+        https://github.com/RockyZ/Scrapy-sqlite-item-exporter
+        Keep it for testing purposes
+    """
+    def __init__(self, file, **kwargs):
+        self._configure(kwargs)
+        self.conn = sqlite3.connect(file)
+        self.conn.text_factory = str
+        self.created_tables = []
+
+    def export_item(self, item):
+        item_class_name = type(item).__name__
+
+        if item_class_name not in self.created_tables:
+            self._create_table(item_class_name,
+                               item.keys()
+                               )
+            self.created_tables.append(item_class_name)
+
+        field_list = []
+        value_list = []
+        for field_name in item.keys():
+            field_list.append('[%s]' % field_name)
+            field = item.fields[field_name]
+            value_list.append(
+                self.serialize_field(field, field_name, str(item[field_name]))
+                )
+
+        sql = 'insert or ignore into [%s] (%s) values (%s)' % \
+            (item_class_name,
+                ', '.join(field_list),
+                ', '.join(['?' for f in field_list])
+             )
+        self.conn.execute(sql, value_list)
+        self.conn.commit()
+
+    def _create_table(self, table_name, columns, keys=None):
+        sql = 'create table if not exists [%s] ' % table_name
+
+        column_define = ['[%s] text' % column for column in columns]
+        print('type: %s' % type(keys))
+        if keys:
+            if len(keys) > 0:
+                primary_key = 'primary key (%s)' % ', '.join(keys[0])
+                column_define.append(primary_key)
+
+            for key in keys[1:]:
+                column_define.append('unique (%s)' % ', '.join(key))
+
+        sql += '(%s)' % ', '.join(column_define)
+
+        print('sql: %s' % sql)
+        self.conn.execute(sql)
+        self.conn.commit()
+
+    def start_exporting(self):
+        pass
+
+    def finish_exporting(self):
+        self.conn.close()
+
+
 def export_to_csv(database):
     """ Exports sqlite database as a csv file """
 

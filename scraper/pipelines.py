@@ -8,7 +8,6 @@
 import datetime
 import logging
 import pymongo
-from itemadapter import ItemAdapter
 from scrapy.exceptions import DropItem
 from scraper.db_utils import SQLiteExporter, export_to_csv
 
@@ -75,7 +74,7 @@ class MongoPipeline:
         self.logger.debug("Inserting items: %s", item)
 
         # prepare item for database entry
-        mongo_item = ItemAdapter(item).asdict()
+        mongo_item = dict(item)
         mongo_item['date'] = datetime.datetime.now().strftime("%d-%m-%Y")
 
         # insert items into database

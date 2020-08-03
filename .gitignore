@@ -8,3 +8,4 @@ scrapinghub.yml
 setup.py
 build
 project.egg-info
+eggs
