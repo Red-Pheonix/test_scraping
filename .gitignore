@@ -9,3 +9,4 @@ setup.py
 build
 project.egg-info
 eggs
+local_settings.py

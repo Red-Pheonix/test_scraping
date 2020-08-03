@@ -3,134 +3,64 @@ import csv
 import datetime
 import logging
 import sqlite3
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import SQLAlchemyError
 from scrapy.exporters import BaseItemExporter
+from scraper.db_orm import Base, ProductInfo, ProductStatus
 
 
-class SQLiteExporter(BaseItemExporter):
+class SQLExporter(BaseItemExporter):
     """ Item exporter for handling sqlite export """
 
     def __init__(self, db, **kwargs):
         self.db = db  # filename for the database
-        self.logger = logging.getLogger("SQLiteExporterLogger")
+        self.logger = logging.getLogger("SQLExporter")
 
-        # if connection fails, connection variable will remain None
-        # check it, otherwise get unhandled errors
-        self.connection = None
-        self.cursor = None
+        # connect to database for use with sqlalchemy
+        db_uri = 'sqlite:///' + self.db
+        self.engine = create_engine(db_uri)
+        self.session_maker = sessionmaker(bind=self.engine)
 
         # create database if it doesn't exist already
         if not os.path.exists(self.db):
-            try:
-                self.connection = sqlite3.connect(self.db)
+            # create all the tables as defined in db_orm classes
+            Base.metadata.create_all(self.engine)
 
-                # configure the newly opened database
-                create_product_info_table_sql = """
-                        CREATE TABLE product_info(
-                            product_id INTEGER NOT NULL,
-                            category TEXT NOT NULL,
-                            name TEXT,
-                            model TEXT,
-                            brand TEXT,
-                            supplier TEXT,
-                            summary TEXT,
-                            PRIMARY KEY(product_id, category)
-                        );
-                """
-                create_product_status_table_sql = """
-                        CREATE TABLE product_status(
-                            product_id INTEGER NOT NULL,
-                            category TEXT NOT NULL,
-                            price REAL,
-                            quantity INTEGER,
-                            date TEXT,
-                            FOREIGN KEY (product_id)
-                                REFERENCES product_info (product_id),
-                            FOREIGN KEY (category)
-                                REFERENCES product_info (category),
-                            PRIMARY KEY(product_id, category, date)
-                        );
-                """
-                self.connection.execute(create_product_info_table_sql)
-                self.connection.execute(create_product_status_table_sql)
-
-                self.connection.commit()
-
-            except sqlite3.Error as error:
-                # shutdown crawling if we can't create database
-                self.logger.error("Couldn't create database: %s", error)
-                if self.connection:
-                    self.connection.rollback()
-                raise error
-            finally:
-                if self.connection:
-                    self.connection.close()
-
-    def start_exporting(self):
+    def _insert_item(self, session, item):
         try:
-            # establish connection to database
-            self.connection = sqlite3.connect(self.db)
-            self.cursor = self.connection.cursor()
-        except sqlite3.Error as error:
-            # shutdown crawling if we can't access database
-            self.logger.error("Error opening database: %s", error)
-            raise error
-
-    def finish_exporting(self):
-        if self.cursor:
-            self.cursor.close()
-        if self.connection:
-            self.connection.close()
-
-    def insert_items(self, sql_command, parameters):
-        """ Helper function for inserting data into the database """
-        try:
-            self.cursor.execute(sql_command, parameters)
-            self.connection.commit()
-        except sqlite3.Error as error:
-            self.logger.error("Error inserting items: %s", error)
-            self.connection.rollback()
+            session.add(item)
+            session.commit()
+        except SQLAlchemyError as e:
+            self.logger.error("Error entering items into database: %s", e)
+            session.rollback()
 
     def export_item(self, item):
-        self.logger.debug("Inserting items: %s", item)
-        # sql for inserting data
-        insert_product_info_sql = """
-            INSERT or IGNORE INTO  product_info(
-                            product_id, category,
-                            name, model, brand,
-                            supplier, summary)
+        # make a session for inserting an item
+        session = self.session_maker()
 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """
-        insert_product_status_sql = """
-            INSERT or IGNORE INTO product_status(
-                            product_id, category,
-                            price, quantity,
-                            date)
+        # prepare items for database entry
+        product_info_item = ProductInfo(
+            product_id=item['product_id'],
+            category=item['category'],
+            name=item['name'],
+            model=item['model'],
+            brand=item['brand'],
+            supplier=item['supplier'],
+            summary=item['summary']
+            )
+        product_status_item = ProductStatus(
+            product_id=item['product_id'],
+            category=item['category'],
+            date=datetime.datetime.now(),
+            price=item['price'],
+            quantity=item['quantity']
+            )
 
-            VALUES (?, ?, ?, ?, ?)
-            """
-        # product info fields
-        product_id = item['product_id']
-        category = item['category']
-        name = item['name']
-        model = item['model']
-        brand = item['brand']
-        supplier = item['supplier']
-        summary = item['summary']
+        self._insert_item(session, product_info_item)
+        self._insert_item(session, product_status_item)
 
-        # product status fields
-        date = datetime.datetime.now().strftime("%d-%m-%Y")
-        price = item['price']
-        quantity = item['quantity']
-
-        # insert items into the two tables
-        self.insert_items(insert_product_info_sql,
-                          (product_id, category, name,
-                           model, brand, supplier, summary)
-                          )
-        self.insert_items(insert_product_status_sql,
-                          (product_id, category, price, quantity, date)
-                          )
+        session.close()
 
 
 class RockySqliteItemExporter(BaseItemExporter):
